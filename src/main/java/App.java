@@ -54,7 +54,6 @@ public class App {
                 return password;
             }
         } catch (TimeoutException e) {
-            // Fall back to a broader DOM search if the expected result block changes.
         }
 
         JavascriptExecutor jsExecutor = (JavascriptExecutor) webDriver;
