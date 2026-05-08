@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -42,32 +43,33 @@ public class App {
     }
 
     private static String extractGeneratedPassword(WebDriver webDriver) {
+        try {
+            WebDriverWait wait = new WebDriverWait(webDriver, Duration.ofSeconds(10));
+            wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("#resultid .verybigtext b")));
+            JavascriptExecutor jsExecutor = (JavascriptExecutor) webDriver;
+            String password = (String) jsExecutor.executeScript(
+                    "var element = document.querySelector('#resultid .verybigtext b');" +
+                    "return element ? element.textContent.trim() : null;");
+            if (!password.isEmpty()) {
+                return password;
+            }
+        } catch (TimeoutException e) {
+            // Fall back to a broader DOM search if the expected result block changes.
+        }
+
         JavascriptExecutor jsExecutor = (JavascriptExecutor) webDriver;
-
         String password = (String) jsExecutor.executeScript(
-                "var elements = Array.from(document.querySelectorAll('input, textarea, td, span, div'));" +
-                "var candidates = elements" +
-                "  .map(function (element) {" +
-                "    var raw = '';" +
-                "    if (typeof element.value === 'string' && element.value.trim().length > 0) {" +
-                "      raw = element.value.trim();" +
-                "    } else if (typeof element.textContent === 'string' && element.textContent.trim().length > 0) {" +
-                "      raw = element.textContent.trim();" +
-                "    }" +
-                "    return raw;" +
-                "  })" +
-                "  .filter(function (value) {" +
-                "    return value.length >= 8" +
-                "      && /[a-z]/.test(value)" +
-                "      && /[A-Z]/.test(value)" +
-                "      && /\\d/.test(value)" +
-                "      && /[^A-Za-z0-9\\s]/.test(value);" +
-                "  })" +
-                "  .sort(function (left, right) { return right.length - left.length; });" +
-                "return candidates.length > 0 ? candidates[0] : null;");
+                "var selectors = ['#resultid .verybigtext b', '#resultid .verybigtext', '#resultid b'];" +
+                "for (var i = 0; i < selectors.length; i++) {" +
+                "  var element = document.querySelector(selectors[i]);" +
+                "  if (element && element.textContent && element.textContent.trim()) {" +
+                "    return element.textContent.trim();" +
+                "  }" +
+                "}" +
+                "return null;");
 
-        if (password != null && !password.isEmpty()) {
-            return password;
+        if (password != null && !password.trim().isEmpty()) {
+            return password.trim();
         }
 
         List<WebElement> textInputs = webDriver.findElements(By.cssSelector("input[type='text'], input:not([type])"));
